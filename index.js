@@ -1,1 +1,5 @@
-404: Not Found
+$w.onReady(function () {
+    $w("#startButton").onClick(() => {
+        wixLocation.to("/detect");
+    });
+});
