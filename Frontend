@@ -1,0 +1,10 @@
+171816151413111210987654321
+      $w('#inputLog').value = logText;      const logText = await response.text();      const response = await fetch(fileUrl);    try {    const fileUrl = uploadedFiles[0]; // This is just a string URL    }      return;      $w('#resultText').text = "⚠️ Please upload a .log file.";    if (!uploadedFiles || uploadedFiles.length === 0) {    const uploadedFiles = $w('#uploadLog').value;  $w('#uploadLog').onChange(async () => {$w.onReady(function () {import { getCVEInfo } from 'backend/nis-tapi';
+
+// 🔴🟠🟡🟢 Risk Level
+function getRiskLevel(score) {
+  if (score >= 60) return "🔴 Critical";
+  if (score >= 40) return "🟠 High";
+  if (score >= 20) return "🟡 Medium";
+  return "🟢 Low";
+}
