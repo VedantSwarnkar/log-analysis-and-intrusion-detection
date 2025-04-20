@@ -1,5 +1,123 @@
-171816151413111210987654321
-      $w('#inputLog').value = logText;      const logText = await response.text();      const response = await fetch(fileUrl);    try {    const fileUrl = uploadedFiles[0]; // This is just a string URL    }      return;      $w('#resultText').text = "⚠️ Please upload a .log file.";    if (!uploadedFiles || uploadedFiles.length === 0) {    const uploadedFiles = $w('#uploadLog').value;  $w('#uploadLog').onChange(async () => {$w.onReady(function () {import { getCVEInfo } from 'backend/nis-tapi';
+import { getCVEInfo } from 'backend/nis-tapi';
+
+$w.onReady(function () {
+  $w('#uploadLog').onChange(async () => {
+    const uploadedFiles = $w('#uploadLog').value;
+
+    if (!uploadedFiles || uploadedFiles.length === 0) {
+      $w('#resultText').text = "⚠️ Please upload a .log file.";
+      return;
+    }
+
+    const fileUrl = uploadedFiles[0]; // This is just a string URL
+
+    try {
+      const response = await fetch(fileUrl);
+      const logText = await response.text();
+
+      $w('#inputLog').value = logText;
+      $w('#resultText').text = "✅ Log file loaded. Click 'Detect' to analyze.";
+    } catch (error) {
+      console.error("Error reading uploaded file:", error);
+      $w('#resultText').text = "❌ Failed to load the uploaded file.";
+    }
+  });
+
+  $w('#btnDetect').onClick(async () => {
+    const logText = $w('#inputLog').value;
+
+    if (logText.trim() === "") {
+      $w('#resultText').text = "⚠️ Please paste some log data.";
+      return;
+    }
+
+    let report = "";
+
+    // Step 1: Intrusion Detection
+    const intrusionResult = detectIntrusion(logText);
+    report += `🔍 Intrusion Check:\n${intrusionResult}\n`;
+
+    // Step 2: Keyword Extraction + CVE Info
+    const keyword = extractKeyword(logText);
+    let severity = "None";
+    let cveData = {};
+
+    if (keyword) {
+      cveData = await getCVEInfo(keyword);
+      severity = cveData.severity;
+
+      report += `\n📄 CVE Info:\nID: ${cveData.id}\nDescription: ${cveData.description}\nSeverity: ${cveData.severity}\n`;
+
+      // 👇 Append AI Explanation here
+      report += `\n🤖 AI Explanation:\n${cveData.explanation || "Not available"}\n`;
+    }
+
+    // Step 3: Risk Scoring + Tagging
+    const score = getRiskScore(logText, severity);
+    const level = getRiskLevel(score);
+
+    report += `\n⚖️ Risk Score: ${score}/100\n🏷️ Risk Level: ${level}`;
+
+    // Output
+    $w('#resultText').text = report;
+  });
+});
+
+// 🛡️ Intrusion Detection
+function detectIntrusion(log) {
+  const suspiciousPatterns = [
+    /unauthorized/i, /failed login/i, /sql injection/i, /nmap scan/i,
+    /malware/i, /root access/i, /brute force/i, /denied/i,
+    /exploit/i, /cmd\.exe/i, /powershell/i, /wget|curl/i,
+    /base64\s+-d/i, /netcat|nc/i
+  ];
+
+  for (const pattern of suspiciousPatterns) {
+    if (pattern.test(log)) {
+      return "⚠️ Suspicious activity detected!";
+    }
+  }
+
+  return "✅ No suspicious activity found.";
+}
+
+// 🔍 Extract potential CVE-related keyword
+function extractKeyword(log) {
+  const cveMatch = log.match(/CVE-\d{4}-\d{4,7}/i);
+  if (cveMatch) return cveMatch[0];
+
+  const tools = ["Apache", "Tomcat", "OpenSSH", "nginx", "MySQL", "WordPress"];
+  for (const tool of tools) {
+    if (log.includes(tool)) return tool;
+  }
+
+  return null;
+}
+
+// 🔢 Risk Score based on patterns + severity
+function getRiskScore(log, severity) {
+  let score = 0;
+
+  if (severity === "CRITICAL") score += 40;
+  else if (severity === "HIGH") score += 30;
+  else if (severity === "MEDIUM") score += 20;
+  else if (severity === "LOW") score += 10;
+
+  const patterns = [
+    { regex: /brute force/i, score: 20 },
+    { regex: /sql injection/i, score: 25 },
+    { regex: /cmd\.exe|powershell/i, score: 15 },
+    { regex: /unauthorized/i, score: 10 },
+    { regex: /netcat|nmap|nc/i, score: 15 },
+    { regex: /wget|curl/i, score: 5 }
+  ];
+
+  patterns.forEach(p => {
+    if (p.regex.test(log)) score += p.score;
+  });
+
+  return Math.min(score, 100);
+}
 
 // 🔴🟠🟡🟢 Risk Level
 function getRiskLevel(score) {
