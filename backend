@@ -1,0 +1,87 @@
+import { fetch } from 'wix-fetch';
+
+// 🔐 Paste your keys below
+const NIST_API_KEY = '';
+const OPENAI_API_KEY = ''; // Use Wix Secrets Manager for production
+
+// 📌 Fetch CVE Info from NIST
+export async function getCVEInfo(keyword) {
+  const encodedKeyword = encodeURIComponent(keyword);
+  const url = `https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch=${encodedKeyword}`;
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'WixIntrusionDetector/1.0',
+        'apiKey': NIST_API_KEY
+      }
+    });
+
+    const data = await response.json();
+    if (data.vulnerabilities && data.vulnerabilities.length > 0) {
+      const cve = data.vulnerabilities[0].cve;
+
+      const id = cve.id || "Unknown";
+      const description = cve.descriptions?.[0]?.value || "No description";
+
+      const rawSeverity =
+        cve.metrics?.cvssMetricV31?.[0]?.cvssData?.baseSeverity ||
+        cve.metrics?.cvssMetricV30?.[0]?.cvssData?.baseSeverity ||
+        cve.metrics?.cvssMetricV2?.[0]?.baseSeverity || "None";
+
+      const severity = rawSeverity.toUpperCase(); // Normalize severity for scoring
+
+      // ✨ AI Explanation from OpenAI
+      const explanation = await getAIExplanation(id, description);
+
+      return {
+        id,
+        description,
+        severity,
+        explanation
+      };
+    } else {
+      return {
+        id: "N/A",
+        description: "No CVE data found",
+        severity: "Unknown",
+        explanation: "N/A"
+      };
+    }
+  } catch (err) {
+    console.error("Error fetching CVE data:", err);
+    return {
+      id: "Error",
+      description: "Could not fetch data from NIST",
+      severity: "Unknown",
+      explanation: "N/A"
+    };
+  }
+}
+
+// 🧠 AI Explanation via OpenAI
+async function getAIExplanation(cveId, description) {
+  const prompt = `Explain the following CVE in simple terms for cybersecurity learners:\n\n${cveId}: ${description}`;
+
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "gpt-3.5-turbo",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.5
+      })
+    });
+
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || "Explanation not available.";
+  } catch (error) {
+    console.error("AI explanation fetch error:", error);
+    return "Could not generate AI explanation.";
+  }
+}
